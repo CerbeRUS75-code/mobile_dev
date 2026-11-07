@@ -7,73 +7,179 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return const MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: Scaffold(
-        appBar: AppBar(title: const Text('Миронов Никита Сергеевич')),
-        body: const Gallery(),
+      home: AudioFormScreen(),
+    );
+  }
+}
+
+class AudioFormScreen extends StatefulWidget {
+  const AudioFormScreen({super.key});
+
+  @override
+  State<AudioFormScreen> createState() => _AudioFormScreenState();
+}
+
+class _AudioFormScreenState extends State<AudioFormScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _mode = TextEditingController();
+  final _frequency = TextEditingController();
+  final _depth = TextEditingController();
+  final _duration = TextEditingController();
+  bool _consent = false;
+
+  @override
+  void dispose() {
+    _mode.dispose();
+    _frequency.dispose();
+    _depth.dispose();
+    _duration.dispose();
+    super.dispose();
+  }
+
+  String? _positiveInteger(String? value) {
+    final number = int.tryParse(value?.trim() ?? '');
+    if (number == null || number <= 0) return 'Введите целое число больше нуля';
+    return null;
+  }
+
+  String? _validateMode(String? value) {
+    if (value?.trim() != '1' && value?.trim() != '2') {
+      return 'Введите 1 для моно или 2 для стерео';
+    }
+    return null;
+  }
+
+  String? _validateDuration(String? value) {
+    final number = double.tryParse((value ?? '').trim().replaceAll(',', '.'));
+    if (number == null || !number.isFinite || number <= 0) {
+      return 'Введите число больше нуля';
+    }
+    return null;
+  }
+
+  void _calculate() {
+    if (!_formKey.currentState!.validate()) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ResultScreen(
+          channels: int.parse(_mode.text.trim()),
+          frequency: int.parse(_frequency.text.trim()),
+          depth: int.parse(_depth.text.trim()),
+          duration: double.parse(_duration.text.trim().replaceAll(',', '.')),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Миронов Никита Сергеевич')),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text('Объём несжатого звукового файла'),
+              TextFormField(
+                controller: _mode,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Режим: 1 — моно, 2 — стерео',
+                ),
+                validator: _validateMode,
+              ),
+              TextFormField(
+                controller: _frequency,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Частота дискретизации, Гц',
+                ),
+                validator: _positiveInteger,
+              ),
+              TextFormField(
+                controller: _depth,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Глубина кодирования, бит',
+                ),
+                validator: _positiveInteger,
+              ),
+              TextFormField(
+                controller: _duration,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: const InputDecoration(
+                  labelText: 'Длительность, секунды',
+                ),
+                validator: _validateDuration,
+              ),
+              FormField<bool>(
+                initialValue: false,
+                validator: (value) =>
+                    value == true ? null : 'Необходимо согласие',
+                builder: (field) => Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Согласие на обработку данных'),
+                      value: _consent,
+                      onChanged: (value) {
+                        setState(() => _consent = value ?? false);
+                        field.didChange(_consent);
+                      },
+                    ),
+                    if (field.hasError)
+                      Text(
+                        field.errorText!,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: _calculate,
+                child: const Text('Рассчитать'),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 }
 
-class Gallery extends StatelessWidget {
-  const Gallery({super.key});
+class ResultScreen extends StatelessWidget {
+  const ResultScreen({
+    super.key,
+    required this.channels,
+    required this.frequency,
+    required this.depth,
+    required this.duration,
+  });
 
-  static const images = [
-    [
-      'https://i.ibb.co/Pvkdc2Vp/6p-Sux-U0-M6sn-ZMo-GOz-M5-HOyd74m9gr-Gj-Ja-CZUR80e2r81hvd-LXMWLm-Rz-AVg8-X-VWMLi-Fqfhs-G1-YGqq5bh6-No-RDa.jpg',
-      'https://i.ibb.co/Kp8tSWkK/J5f-WVv-QOz12vz8-Y5y-Si-Ruh0h8z-Cqq-Rc6-PSm-RZTUJn4-Cw5-Cmei6a-Fz6jo5-Yh-ANg-qw-Q8-zx5-CGUz-Frx6-Mqs-HSDHWH.jpg',
-      'https://i.ibb.co/fVS3vG3h/lzmd-CGIxh6k-Dwbh-Ac900en-Gt40-QNj252mf-DUgbyr49tuamy-Lcs-PBCVF6-HCQxj-Xog6-Jy9-G9yxw-ZKkvi0cdj-Umi9gx.jpg',
-    ],
-    [
-      'https://i.ibb.co/NdmfbtVj/qk-Gz1z-Ug-We-HPUpv-Hgh-P246cc-SHQqpwdv-QHSCAADrz-O4a-Eo-F9x1o-Dmbj8-DPhval-AAa-A2-EUxbz1-QKIthe-Zh-JZ8.jpg',
-      'https://i.ibb.co/dw4jXh7x/t-Yq0-Ovmb55c-Cq9tw-C5-B8-EQCjg-Mz-Bj-XCw-M3-MSDs9-2-R5-RUi-URY0-KXPMq-TY7-Qet-ZBFPEWr0-Ja-Fd-E4-Mj-Nn-vv1-MXu.jpg',
-      'https://i.ibb.co/RGcc00hK/LSLE2cr-S038-LPf-B5-Sflh-jw9vlsi-c0fog-Sy1-WIx-Vnio-MDt-Qud4fm-ENp-U7-Oa-SPYt-JSh-Q9-F3-REiqmjfnb-J4-Rz-BUA.jpg',
-    ],
-    [
-      'https://i.ibb.co/JW7B3ZVW/qdu-Noswq-Xf9o-Zijds-TVMbj-Iv-C12nh-Vb-Mp-ULmhp-Qkkh7-N8-Rg-O7c-Wl1l-CWe9-Sv3ev-Qp-UFjfzkbb-Lin3-J3-Fou-Q.jpg',
-      'https://i.ibb.co/GQHwd03T/u-Qk-COdwm-Jek-Tlw64-Blx-Col-Jwgqs-Pphiazj-No-Eao2yc-iu-T8r-O8m-Wv-Kx-O9-BTEt-TViw-Oh-Juf-Mg-vj-Kf-YMH.jpg',
-      'https://i.ibb.co/NdBZPX24/C5-Zu-V1-U6y3-Dcc7f-Tenta-P85a-TRv-Vkc-LLJIKAFw-Tmy3-Ow-NHYPl-Ah-B7-TEo-R2dgv-Rs-Lcbdrw-Vd-D9-Enl-Jm-IT0tr.jpg',
-    ],
-  ];
+  final int channels;
+  final int frequency;
+  final int depth;
+  final double duration;
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          for (final row in images)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  for (final url in row)
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: Container(
-                          height: 110,
-                          clipBehavior: Clip.antiAlias,
-                          decoration: BoxDecoration(
-                            color: Colors.blueGrey.shade100,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Image.network(
-                            url,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) =>
-                                const Icon(Icons.broken_image_outlined),
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-        ],
+    final bytes = frequency.toDouble() * channels * depth * duration / 8;
+    return Scaffold(
+      appBar: AppBar(title: const Text('Миронов Никита Сергеевич')),
+      body: Center(
+        child: Text('Объём файла: ${bytes.toStringAsFixed(2)} байт'),
       ),
     );
   }
