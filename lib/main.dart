@@ -3,6 +3,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'cubit/audio_cubit.dart';
 import 'cubit/audio_state.dart';
+import 'data/calculation_storage.dart';
+import 'history/history_cubit.dart';
+import 'history/history_screen.dart';
 
 void main() => runApp(const MyApp());
 
@@ -14,7 +17,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       home: BlocProvider(
-        create: (context) => AudioCubit(),
+        create: (context) => AudioCubit(CalculationStorage())..loadLast(),
         child: const AudioScreen(),
       ),
     );
@@ -82,11 +85,41 @@ class _AudioScreenState extends State<AudioScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<AudioCubit, AudioState>(
+    return BlocConsumer<AudioCubit, AudioState>(
+      listener: (context, state) {
+        if (state is AudioInput && state.last != null) {
+          final last = state.last!;
+          _mode.text = '${last['channels']}';
+          _frequency.text = '${last['frequency']}';
+          _depth.text = '${last['depth']}';
+          _duration.text = '${last['duration']}';
+          _consent = last['consent'] as bool;
+        }
+      },
       builder: (context, state) {
         return Scaffold(
-          appBar: AppBar(title: const Text('Миронов Никита Сергеевич')),
-          body: _buildForm(state),
+          appBar: AppBar(
+            leading: IconButton(
+              tooltip: 'История расчётов',
+              icon: const Icon(Icons.history),
+              onPressed: () {
+                final storage = context.read<AudioCubit>().storage;
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => BlocProvider(
+                      create: (context) => HistoryCubit(storage)..load(),
+                      child: const HistoryScreen(),
+                    ),
+                  ),
+                );
+              },
+            ),
+            title: const Text('Миронов Никита Сергеевич'),
+          ),
+          body: state is AudioLoading
+              ? const Center(child: CircularProgressIndicator())
+              : _buildForm(state),
         );
       },
     );
@@ -169,6 +202,19 @@ class _AudioScreenState extends State<AudioScreen> {
             if (state is AudioResult) ...[
               const SizedBox(height: 16),
               Text('Объём файла: ${state.bytes.toStringAsFixed(2)} байт'),
+            ],
+            if (state is AudioInput && state.last != null) ...[
+              const SizedBox(height: 16),
+              Text(
+                'Объём файла: ${(state.last!['bytes'] as double).toStringAsFixed(2)} байт',
+              ),
+            ],
+            if (state is AudioError) ...[
+              const SizedBox(height: 16),
+              Text(
+                state.message,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
             ],
           ],
         ),
