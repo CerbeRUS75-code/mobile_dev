@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+
+import 'cubit/audio_cubit.dart';
+import 'cubit/audio_state.dart';
 
 void main() => runApp(const MyApp());
 
@@ -7,21 +11,24 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
+    return MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: AudioFormScreen(),
+      home: BlocProvider(
+        create: (context) => AudioCubit(),
+        child: const AudioScreen(),
+      ),
     );
   }
 }
 
-class AudioFormScreen extends StatefulWidget {
-  const AudioFormScreen({super.key});
+class AudioScreen extends StatefulWidget {
+  const AudioScreen({super.key});
 
   @override
-  State<AudioFormScreen> createState() => _AudioFormScreenState();
+  State<AudioScreen> createState() => _AudioScreenState();
 }
 
-class _AudioFormScreenState extends State<AudioFormScreen> {
+class _AudioScreenState extends State<AudioScreen> {
   final _formKey = GlobalKey<FormState>();
   final _mode = TextEditingController();
   final _frequency = TextEditingController();
@@ -60,126 +67,111 @@ class _AudioFormScreenState extends State<AudioFormScreen> {
   }
 
   void _calculate() {
-    if (!_formKey.currentState!.validate()) return;
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => ResultScreen(
-          channels: int.parse(_mode.text.trim()),
-          frequency: int.parse(_frequency.text.trim()),
-          depth: int.parse(_depth.text.trim()),
-          duration: double.parse(_duration.text.trim().replaceAll(',', '.')),
-        ),
-      ),
+    if (!_formKey.currentState!.validate()) {
+      context.read<AudioCubit>().edit();
+      return;
+    }
+    FocusScope.of(context).unfocus();
+    context.read<AudioCubit>().calculate(
+      channels: int.parse(_mode.text.trim()),
+      frequency: int.parse(_frequency.text.trim()),
+      depth: int.parse(_depth.text.trim()),
+      duration: double.parse(_duration.text.trim().replaceAll(',', '.')),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Миронов Никита Сергеевич')),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Text('Объём несжатого звукового файла'),
-              TextFormField(
-                controller: _mode,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Режим: 1 — моно, 2 — стерео',
-                ),
-                validator: _validateMode,
+    return BlocBuilder<AudioCubit, AudioState>(
+      builder: (context, state) {
+        return Scaffold(
+          appBar: AppBar(title: const Text('Миронов Никита Сергеевич')),
+          body: _buildForm(state),
+        );
+      },
+    );
+  }
+
+  Widget _buildForm(AudioState state) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text('Объём несжатого звукового файла'),
+            TextFormField(
+              controller: _mode,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Режим: 1 — моно, 2 — стерео',
               ),
-              TextFormField(
-                controller: _frequency,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Частота дискретизации, Гц',
-                ),
-                validator: _positiveInteger,
+              validator: _validateMode,
+            ),
+            TextFormField(
+              controller: _frequency,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Частота дискретизации, Гц',
               ),
-              TextFormField(
-                controller: _depth,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Глубина кодирования, бит',
-                ),
-                validator: _positiveInteger,
+              validator: _positiveInteger,
+            ),
+            TextFormField(
+              controller: _depth,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Глубина кодирования, бит',
               ),
-              TextFormField(
-                controller: _duration,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                decoration: const InputDecoration(
-                  labelText: 'Длительность, секунды',
-                ),
-                validator: _validateDuration,
+              validator: _positiveInteger,
+            ),
+            TextFormField(
+              controller: _duration,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
               ),
-              FormField<bool>(
-                initialValue: false,
-                validator: (value) =>
-                    value == true ? null : 'Необходимо согласие',
-                builder: (field) => Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    CheckboxListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('Согласие на обработку данных'),
-                      value: _consent,
-                      onChanged: (value) {
-                        setState(() => _consent = value ?? false);
-                        field.didChange(_consent);
-                      },
-                    ),
-                    if (field.hasError)
-                      Text(
-                        field.errorText!,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
-                        ),
+              decoration: const InputDecoration(
+                labelText: 'Длительность, секунды',
+              ),
+              validator: _validateDuration,
+            ),
+            FormField<bool>(
+              initialValue: _consent,
+              validator: (value) =>
+                  value == true ? null : 'Необходимо согласие',
+              builder: (field) => Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Согласие на обработку данных'),
+                    value: field.value,
+                    onChanged: (value) {
+                      setState(() => _consent = value ?? false);
+                      field.didChange(_consent);
+                    },
+                  ),
+                  if (field.hasError)
+                    Text(
+                      field.errorText!,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
                       ),
-                  ],
-                ),
+                    ),
+                ],
               ),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _calculate,
+              child: const Text('Рассчитать'),
+            ),
+            if (state is AudioResult) ...[
               const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: _calculate,
-                child: const Text('Рассчитать'),
-              ),
+              Text('Объём файла: ${state.bytes.toStringAsFixed(2)} байт'),
             ],
-          ),
+          ],
         ),
-      ),
-    );
-  }
-}
-
-class ResultScreen extends StatelessWidget {
-  const ResultScreen({
-    super.key,
-    required this.channels,
-    required this.frequency,
-    required this.depth,
-    required this.duration,
-  });
-
-  final int channels;
-  final int frequency;
-  final int depth;
-  final double duration;
-
-  @override
-  Widget build(BuildContext context) {
-    final bytes = frequency.toDouble() * channels * depth * duration / 8;
-    return Scaffold(
-      appBar: AppBar(title: const Text('Миронов Никита Сергеевич')),
-      body: Center(
-        child: Text('Объём файла: ${bytes.toStringAsFixed(2)} байт'),
       ),
     );
   }
